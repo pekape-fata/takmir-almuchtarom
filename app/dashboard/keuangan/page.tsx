@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase'
 import { useUserRole } from '@/lib/useUserRole'
 import { Modal } from '@/components/Modal'
 import { motion } from 'framer-motion'
-import { Plus, Pencil, Trash2, FileDown, TrendingUp, TrendingDown, Wallet } from 'lucide-react'
+import { Plus, Pencil, Trash2, FileDown, TrendingUp, TrendingDown, Wallet, AlertTriangle, Copy, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Keuangan } from '@/types/database'
 import {
@@ -27,8 +27,14 @@ const deriveYearMonth = (dateStr: string) => {
   return { tahun: y, bulan: m }
 }
 
-const formatTanggal = (dateStr: string) =>
-  new Date(dateStr + 'T00:00:00').toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
+// Format tanggal untuk ditampilkan. Jika kolom `tanggal` belum tersedia
+// di database (skema lama), fallback ke nama bulan + tahun.
+const formatTanggal = (row: Keuangan) => {
+  if (row.tanggal) {
+    return new Date(row.tanggal + 'T00:00:00').toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
+  }
+  return `${BULAN[row.bulan - 1]} ${row.tahun}`
+}
 
 const today = () => new Date().toISOString().slice(0, 10)
 
@@ -47,6 +53,26 @@ const emptyForm = () => {
   }
 }
 
+// SQL migration yang dibutuhkan jika kolom `tanggal` belum ada di tabel `keuangan`.
+// Termasuk reload schema cache PostgREST agar perubahan langsung dikenali API.
+const MIGRATION_SQL = `alter table keuangan add column if not exists tanggal date;
+
+update keuangan
+set tanggal = make_date(tahun, bulan, 1)
+where tanggal is null;
+
+alter table keuangan alter column tanggal set not null;
+alter table keuangan alter column tanggal set default current_date;
+
+notify pgrst, 'reload schema';`
+
+// Deteksi error PostgREST "kolom tidak ditemukan" (42703 / "does not exist" / "tanggal")
+const isMissingTanggalColumnError = (error: { code?: string; message?: string } | null) => {
+  if (!error) return false
+  const msg = (error.message ?? '').toLowerCase()
+  return error.code === '42703' || (msg.includes('tanggal') && (msg.includes('column') || msg.includes('exist')))
+}
+
 export default function KeuanganPage() {
   const supabase = createClient()
   const { canManage, userId } = useUserRole()
@@ -59,14 +85,39 @@ export default function KeuanganPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Keuangan | null>(null)
   const [form, setForm] = useState(emptyForm())
+  const [schemaOutdated, setSchemaOutdated] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   const fetchData = async () => {
     setLoading(true)
-    let query = supabase.from('keuangan').select('*').eq('tahun', tahun)
-    if (bulan !== 'all') query = query.eq('bulan', bulan)
-    const { data: rows, error } = await query.order('tanggal', { ascending: true })
-    if (error) toast.error('Gagal memuat data keuangan')
-    setData(rows ?? [])
+
+    let baseQuery = supabase.from('keuangan').select('*').eq('tahun', tahun)
+    if (bulan !== 'all') baseQuery = baseQuery.eq('bulan', bulan)
+
+    // Coba urutkan berdasarkan tanggal (skema terbaru)
+    const { data: rows, error } = await baseQuery.order('tanggal', { ascending: true })
+
+    if (error) {
+      if (isMissingTanggalColumnError(error)) {
+        // Skema lama: kolom `tanggal` belum ada di database.
+        // Fallback agar halaman tetap bisa dipakai, urutkan berdasarkan bulan.
+        setSchemaOutdated(true)
+
+        let fallbackQuery = supabase.from('keuangan').select('*').eq('tahun', tahun)
+        if (bulan !== 'all') fallbackQuery = fallbackQuery.eq('bulan', bulan)
+        const fallback = await fallbackQuery.order('bulan', { ascending: true })
+
+        if (fallback.error) toast.error('Gagal memuat data keuangan: ' + fallback.error.message)
+        setData(fallback.data ?? [])
+      } else {
+        toast.error('Gagal memuat data keuangan: ' + error.message)
+        setData([])
+      }
+    } else {
+      setSchemaOutdated(false)
+      setData(rows ?? [])
+    }
+
     setLoading(false)
   }
 
@@ -125,7 +176,7 @@ export default function KeuanganPage() {
   const openEdit = (k: Keuangan) => {
     setEditing(k)
     setForm({
-      tanggal: k.tanggal, tahun: k.tahun, bulan: k.bulan, jenis: k.jenis, kategori: k.kategori,
+      tanggal: k.tanggal ?? getDefaultTanggal(), tahun: k.tahun, bulan: k.bulan, jenis: k.jenis, kategori: k.kategori,
       keterangan: k.keterangan ?? '', jumlah: k.jumlah, bukti_url: k.bukti_url ?? '',
     })
     setModalOpen(true)
@@ -137,12 +188,18 @@ export default function KeuanganPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Jika kolom `tanggal` belum ada di database (skema lama), jangan kirim
+    // field tersebut agar insert/update tetap berhasil pada skema lama.
+    const payload: Record<string, unknown> = { ...form }
+    if (schemaOutdated) delete payload.tanggal
+
     if (editing) {
-      const { error } = await supabase.from('keuangan').update(form).eq('id', editing.id)
+      const { error } = await supabase.from('keuangan').update(payload).eq('id', editing.id)
       if (error) return toast.error('Gagal menyimpan: ' + error.message)
       toast.success('Transaksi diperbarui')
     } else {
-      const { error } = await supabase.from('keuangan').insert({ ...form, created_by: userId })
+      const { error } = await supabase.from('keuangan').insert({ ...payload, created_by: userId })
       if (error) return toast.error('Gagal menyimpan: ' + error.message)
       toast.success('Transaksi ditambahkan')
     }
@@ -156,6 +213,17 @@ export default function KeuanganPage() {
     if (error) return toast.error('Gagal menghapus')
     toast.success('Transaksi dihapus')
     fetchData()
+  }
+
+  const handleCopySQL = async () => {
+    try {
+      await navigator.clipboard.writeText(MIGRATION_SQL)
+      setCopied(true)
+      toast.success('SQL disalin ke clipboard')
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      toast.error('Gagal menyalin, silakan salin manual')
+    }
   }
 
   const handleExportPDF = async () => {
@@ -179,7 +247,7 @@ export default function KeuanganPage() {
 
     data.forEach((row) => {
       if (y > 280) { doc.addPage(); y = 20 }
-      doc.text(formatTanggal(row.tanggal), 14, y)
+      doc.text(formatTanggal(row), 14, y)
       doc.text(row.jenis, 50, y)
       doc.text(row.kategori, 80, y)
       doc.text((row.keterangan ?? '-').slice(0, 28), 115, y)
@@ -202,6 +270,38 @@ export default function KeuanganPage() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
+      {schemaOutdated && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 rounded-2xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-4"
+        >
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" size={20} />
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-amber-800 dark:text-amber-300">
+                Database belum diperbarui (kolom &quot;tanggal&quot; belum ada)
+              </p>
+              <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
+                Halaman ini tetap bisa dipakai (data diurutkan per bulan), tetapi fitur tanggal transaksi
+                belum aktif. Minta admin/developer menjalankan SQL berikut sekali di{' '}
+                <strong>Supabase → SQL Editor</strong> untuk mengaktifkannya:
+              </p>
+              <div className="relative mt-3">
+                <pre className="text-xs bg-white dark:bg-gray-950 border border-amber-200 dark:border-amber-900 rounded-xl p-3 overflow-x-auto whitespace-pre-wrap">{MIGRATION_SQL}</pre>
+                <button
+                  onClick={handleCopySQL}
+                  className="absolute top-2 right-2 flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900 transition-colors"
+                >
+                  {copied ? <Check size={12} /> : <Copy size={12} />}
+                  {copied ? 'Tersalin' : 'Salin SQL'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold">Laporan Keuangan</h1>
@@ -295,7 +395,7 @@ export default function KeuanganPage() {
               <tr><td colSpan={6} className="px-4 py-6 text-center text-gray-500">Belum ada transaksi pada periode ini.</td></tr>
             ) : data.map((row) => (
               <tr key={row.id} className="border-b border-gray-100 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/40">
-                <td className="px-4 py-3 whitespace-nowrap">{formatTanggal(row.tanggal)}</td>
+                <td className="px-4 py-3 whitespace-nowrap">{formatTanggal(row)}</td>
                 <td className="px-4 py-3">
                   <span className={`text-xs px-2 py-1 rounded-full ${row.jenis === 'masuk' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400' : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400'}`}>
                     {row.jenis === 'masuk' ? 'Pemasukan' : 'Pengeluaran'}
@@ -333,6 +433,7 @@ export default function KeuanganPage() {
             />
             <p className="text-xs text-gray-400 mt-1">
               Tahun &amp; bulan laporan ({form.tahun} / {BULAN[form.bulan - 1]}) otomatis diambil dari tanggal ini.
+              {schemaOutdated && ' (Tanggal lengkap akan tersimpan setelah migrasi database dijalankan.)'}
             </p>
           </div>
           <div>

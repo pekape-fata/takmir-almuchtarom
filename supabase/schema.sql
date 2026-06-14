@@ -1,6 +1,11 @@
 -- =========================================================
 -- SCHEMA: Takmir Langgar Waqaf Al Muchtarom
 -- Jalankan di Supabase SQL Editor
+--
+-- File ini AMAN dijalankan berulang kali (idempotent):
+-- - Tabel/index/trigger/fungsi: tidak akan error jika sudah ada
+-- - Policy: di-drop dulu lalu dibuat ulang (selalu konsisten)
+-- - Seed data pengurus: hanya dimasukkan jika tabel masih kosong
 -- =========================================================
 
 -- ============ TABEL PROFILES ============
@@ -131,71 +136,88 @@ alter table jadwal_sholat_cache enable row level security;
 alter table konsultasi enable row level security;
 
 -- ---------- PROFILES ----------
+drop policy if exists "User bisa lihat profil sendiri" on profiles;
 create policy "User bisa lihat profil sendiri" on profiles
   for select to authenticated using (id = auth.uid());
 
+drop policy if exists "Admin lihat semua profil" on profiles;
 create policy "Admin lihat semua profil" on profiles
   for select to authenticated using (current_role_is(array['admin']));
 
+drop policy if exists "User update profil sendiri" on profiles;
 create policy "User update profil sendiri" on profiles
   for update to authenticated using (id = auth.uid());
 
+drop policy if exists "Admin update semua profil" on profiles;
 create policy "Admin update semua profil" on profiles
   for update to authenticated
   using (current_role_is(array['admin']))
   with check (current_role_is(array['admin']));
 
 -- ---------- PENGURUS (publik bisa baca) ----------
+drop policy if exists "Publik baca pengurus" on pengurus;
 create policy "Publik baca pengurus" on pengurus
   for select to anon, authenticated using (true);
 
+drop policy if exists "Admin kelola pengurus" on pengurus;
 create policy "Admin kelola pengurus" on pengurus
   for all to authenticated
   using (current_role_is(array['admin','pengurus']))
   with check (current_role_is(array['admin','pengurus']));
 
 -- ---------- KEUANGAN (publik bisa baca, pengurus/admin CRUD) ----------
+drop policy if exists "Publik baca keuangan" on keuangan;
 create policy "Publik baca keuangan" on keuangan
   for select to anon, authenticated using (true);
 
+drop policy if exists "Pengurus kelola keuangan" on keuangan;
 create policy "Pengurus kelola keuangan" on keuangan
   for all to authenticated
   using (current_role_is(array['admin','pengurus']))
   with check (current_role_is(array['admin','pengurus']));
 
 -- ---------- KEGIATAN (publik bisa baca, pengurus/admin CRUD) ----------
+drop policy if exists "Publik baca kegiatan" on kegiatan;
 create policy "Publik baca kegiatan" on kegiatan
   for select to anon, authenticated using (true);
 
+drop policy if exists "Pengurus kelola kegiatan" on kegiatan;
 create policy "Pengurus kelola kegiatan" on kegiatan
   for all to authenticated
   using (current_role_is(array['admin','pengurus']))
   with check (current_role_is(array['admin','pengurus']));
 
 -- ---------- JADWAL SHOLAT CACHE (publik baca, sistem tulis) ----------
+drop policy if exists "Publik baca jadwal sholat" on jadwal_sholat_cache;
 create policy "Publik baca jadwal sholat" on jadwal_sholat_cache
   for select to anon, authenticated using (true);
 
+drop policy if exists "Authenticated bisa insert jadwal cache" on jadwal_sholat_cache;
 create policy "Authenticated bisa insert jadwal cache" on jadwal_sholat_cache
   for insert to authenticated with check (true);
 
 -- ---------- KONSULTASI ----------
 -- Publik (anon) bisa kirim pertanyaan (insert) tanpa login
+drop policy if exists "Siapapun bisa ajukan konsultasi" on konsultasi;
 create policy "Siapapun bisa ajukan konsultasi" on konsultasi
   for insert to anon, authenticated with check (true);
 
 -- Hanya jawaban yang sudah 'verified' tampil ke publik
+drop policy if exists "Publik baca konsultasi terverifikasi" on konsultasi;
 create policy "Publik baca konsultasi terverifikasi" on konsultasi
   for select to anon using (status = 'verified');
 
 -- User login bisa lihat konsultasi miliknya sendiri (semua status)
+drop policy if exists "User lihat konsultasi sendiri" on konsultasi;
 create policy "User lihat konsultasi sendiri" on konsultasi
   for select to authenticated using (user_id = auth.uid() or status = 'verified');
 
 -- Admin / pengurus (sebagai ustadz/narasumber) bisa lihat & update semua
+drop policy if exists "Ustadz kelola konsultasi" on konsultasi;
 create policy "Ustadz kelola konsultasi" on konsultasi
   for select to authenticated using (current_role_is(array['admin','pengurus']));
 
+drop policy if exists "Ustadz update konsultasi" on konsultasi;
 create policy "Ustadz update konsultasi" on konsultasi
   for update to authenticated
   using (current_role_is(array['admin','pengurus']))
@@ -203,9 +225,19 @@ create policy "Ustadz update konsultasi" on konsultasi
 
 -- =========================================================
 -- SEED DATA CONTOH (opsional)
+-- Hanya dimasukkan jika tabel pengurus masih kosong, agar
+-- aman dijalankan berulang kali tanpa membuat duplikat.
 -- =========================================================
-insert into pengurus (nama, jabatan, periode, urutan, kontak) values
+insert into pengurus (nama, jabatan, periode, urutan, kontak)
+select * from (values
   ('H. Ahmad Muchtarom', 'Ketua Takmir', '2024-2027', 1, '0812xxxxxxx'),
   ('Drs. Slamet Riyadi', 'Sekretaris', '2024-2027', 2, '0813xxxxxxx'),
   ('Hj. Siti Aminah', 'Bendahara', '2024-2027', 3, '0814xxxxxxx')
-on conflict do nothing;
+) as seed(nama, jabatan, periode, urutan, kontak)
+where not exists (select 1 from pengurus);
+
+-- =========================================================
+-- Paksa PostgREST (Supabase API) memuat ulang schema cache,
+-- supaya kolom/tabel yang baru dibuat/diubah langsung dikenali API.
+-- =========================================================
+notify pgrst, 'reload schema';

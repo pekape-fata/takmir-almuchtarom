@@ -13,3 +13,9 @@ where tanggal is null;
 
 alter table keuangan alter column tanggal set not null;
 alter table keuangan alter column tanggal set default current_date;
+
+-- PENTING: paksa PostgREST (Supabase API) memuat ulang schema cache.
+-- Tanpa ini, API bisa terus menganggap kolom `tanggal` belum ada
+-- (error 400 "column keuangan.tanggal does not exist") meskipun
+-- secara fisik kolom sudah berhasil ditambahkan di atas.
+notify pgrst, 'reload schema';

@@ -36,6 +36,10 @@ Project ini sudah diinisialisasi sebagai repo Git lokal (branch `main`, commit a
 2. Buka **SQL Editor** → New query → jalankan isi file `supabase/schema.sql` secara penuh.
    - Ini membuat semua tabel (`profiles`, `pengurus`, `keuangan`, `kegiatan`,
      `jadwal_sholat_cache`, `konsultasi`), trigger `handle_new_user`, dan semua RLS policy.
+   - 💡 File ini **aman dijalankan berulang kali** (idempotent) — jika ragu apakah
+     sudah pernah dijalankan atau ada bagian yang gagal, cukup jalankan ulang saja.
+     Policy akan di-replace, tabel/index tidak akan error jika sudah ada, dan seed
+     data pengurus tidak akan terduplikasi.
 3. Buka **Settings → API**, catat 3 nilai berikut:
    | Nilai | Untuk variabel |
    |---|---|
