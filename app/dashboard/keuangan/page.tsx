@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useUserRole } from '@/lib/useUserRole'
 import { Modal } from '@/components/Modal'
@@ -9,7 +9,7 @@ import { Plus, Pencil, Trash2, FileDown, TrendingUp, TrendingDown, Wallet } from
 import { toast } from 'sonner'
 import type { Keuangan } from '@/types/database'
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
+  BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
 } from 'recharts'
 
 const BULAN = [
@@ -51,7 +51,8 @@ export default function KeuanganPage() {
   const supabase = createClient()
   const { canManage, userId } = useUserRole()
   const [data, setData] = useState<Keuangan[]>([])
-  const [mounted, setMounted] = useState(false)
+  const chartContainerRef = useRef<HTMLDivElement>(null)
+  const [chartSize, setChartSize] = useState({ width: 0, height: 0 })
   const [loading, setLoading] = useState(true)
   const [tahun, setTahun] = useState(new Date().getFullYear())
   const [bulan, setBulan] = useState<number | 'all'>('all')
@@ -70,7 +71,17 @@ export default function KeuanganPage() {
   }
 
   useEffect(() => {
-    setMounted(true)
+    const el = chartContainerRef.current
+    if (!el) return
+
+    const updateSize = () => {
+      setChartSize({ width: el.clientWidth, height: el.clientHeight })
+    }
+    updateSize()
+
+    const observer = new ResizeObserver(() => updateSize())
+    observer.observe(el)
+    return () => observer.disconnect()
   }, [])
 
   useEffect(() => {
@@ -248,9 +259,9 @@ export default function KeuanganPage() {
 
       {/* Chart */}
       <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 mb-6 h-72">
-        {mounted ? (
-          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-            <BarChart data={chartData}>
+        <div ref={chartContainerRef} className="w-full h-full">
+          {chartSize.width > 0 && chartSize.height > 0 ? (
+            <BarChart width={chartSize.width} height={chartSize.height} data={chartData}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
               <XAxis dataKey="bulan" fontSize={12} />
               <YAxis fontSize={12} tickFormatter={(v) => `${v / 1000}k`} />
@@ -258,10 +269,10 @@ export default function KeuanganPage() {
               <Bar dataKey="masuk" fill="#6f9472" radius={[4, 4, 0, 0]} name="Pemasukan" />
               <Bar dataKey="keluar" fill="#c08552" radius={[4, 4, 0, 0]} name="Pengeluaran" />
             </BarChart>
-          </ResponsiveContainer>
-        ) : (
-          <div className="w-full h-full animate-pulse rounded-xl bg-gray-100 dark:bg-gray-800" />
-        )}
+          ) : (
+            <div className="w-full h-full animate-pulse rounded-xl bg-gray-100 dark:bg-gray-800" />
+          )}
+        </div>
       </div>
 
       {/* Table */}
