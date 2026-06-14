@@ -1,27 +1,88 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* next-themes menambahkan class .dark pada <html>, jadi variant `dark:`
+   harus mengikuti class tersebut (bukan prefers-color-scheme OS). */
+@custom-variant dark (&:where(.dark, .dark *));
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+@theme {
+  /* ============================================================
+     PALET SAGE — menggantikan palet "gray" default Tailwind.
+     Dipakai untuk background halaman, kartu, border & teks utama
+     di seluruh aplikasi (terang & gelap).
+     ============================================================ */
+  --color-gray-50:  oklch(98.5% 0.012 135);
+  --color-gray-100: oklch(96.7% 0.018 135);
+  --color-gray-200: oklch(92.8% 0.024 135);
+  --color-gray-300: oklch(87.2% 0.030 135);
+  --color-gray-400: oklch(70.7% 0.036 135);
+  --color-gray-500: oklch(55.1% 0.034 135);
+  --color-gray-600: oklch(44.6% 0.032 135);
+  --color-gray-700: oklch(37.3% 0.030 135);
+  --color-gray-800: oklch(27.8% 0.026 135);
+  --color-gray-900: oklch(21%   0.022 135);
+  --color-gray-950: oklch(13%   0.018 135);
+
+  /* ============================================================
+     EMERALD (warna aksen utama / brand) — sedikit diredupkan &
+     digeser ke arah hue sage agar selaras dengan background,
+     tidak terasa terlalu "neon".
+     ============================================================ */
+  --color-emerald-50:  oklch(97.9% 0.016 152);
+  --color-emerald-100: oklch(95%   0.038 150);
+  --color-emerald-200: oklch(90.5% 0.064 149);
+  --color-emerald-300: oklch(84.5% 0.095 148);
+  --color-emerald-400: oklch(76.5% 0.120 146);
+  --color-emerald-500: oklch(69.6% 0.115 145);
+  --color-emerald-600: oklch(59.6% 0.100 145);
+  --color-emerald-700: oklch(50.8% 0.085 147);
+  --color-emerald-800: oklch(43.2% 0.070 150);
+  --color-emerald-900: oklch(37.8% 0.058 154);
+  --color-emerald-950: oklch(26.2% 0.040 158);
+
+  /* ============================================================
+     RED (tombol hapus / status pengeluaran) — chroma diturunkan
+     & hue digeser ke arah terracotta agar tidak "menyala" dan
+     lebih harmonis dengan sage (pasangan earthy klasik).
+     ============================================================ */
+  --color-red-50:  oklch(97.1% 0.010 32);
+  --color-red-100: oklch(93.6% 0.024 32);
+  --color-red-200: oklch(88.5% 0.045 31);
+  --color-red-300: oklch(80.8% 0.078 31);
+  --color-red-400: oklch(70.4% 0.122 30);
+  --color-red-500: oklch(63.7% 0.150 29);
+  --color-red-600: oklch(57.7% 0.152 28);
+  --color-red-700: oklch(50.5% 0.132 28);
+  --color-red-800: oklch(44.4% 0.110 27);
+  --color-red-900: oklch(39.6% 0.088 26);
+  --color-red-950: oklch(25.8% 0.058 26);
+
+  /* ============================================================
+     AMBER (status pending / draft) — chroma sedikit diturunkan
+     ============================================================ */
+  --color-amber-50:  oklch(98.7% 0.018 95);
+  --color-amber-100: oklch(96.2% 0.046 95);
+  --color-amber-200: oklch(92.4% 0.092 95);
+  --color-amber-700: oklch(55.5% 0.128 49);
+  --color-amber-900: oklch(41.4% 0.086 46);
+
+  /* ============================================================
+     BLUE (badge kegiatan "akan datang") — chroma diturunkan
+     supaya tidak terlalu mencolok di antara warna sage
+     ============================================================ */
+  --color-blue-100: oklch(93.2% 0.020 255);
+  --color-blue-400: oklch(70.7% 0.115 254);
+  --color-blue-700: oklch(48.8% 0.165 264);
+  --color-blue-900: oklch(37.9% 0.105 265);
+
+  /* ============================================================
+     PURPLE (badge role admin) — chroma diturunkan
+     ============================================================ */
+  --color-purple-100: oklch(94.6% 0.022 307);
+  --color-purple-700: oklch(49.6% 0.185 302);
+  --color-purple-900: oklch(38.1% 0.125 305);
+
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
 }
 
 /* Sembunyikan elemen tertentu saat cetak */

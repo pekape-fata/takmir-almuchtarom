@@ -42,18 +42,10 @@ export async function proxy(request: NextRequest) {
       .eq('id', user.id)
       .single()
 
-    if (user) {
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role, force_password_change')
-    .eq('id', user.id)
-    .single()
-
-  // Halaman admin hanya untuk role admin
-  if (path.startsWith('/dashboard/admin') && profile?.role !== 'admin') {
-    return NextResponse.redirect(new URL('/', request.url))
-  }
-}
+    // Wajib ganti password sebelum mengakses dashboard manapun
+    if (profile?.force_password_change && path.startsWith('/dashboard') && path !== '/change-password') {
+      return NextResponse.redirect(new URL('/change-password', request.url))
+    }
 
     // Halaman admin hanya untuk role admin
     if (path.startsWith('/dashboard/admin') && profile?.role !== 'admin') {

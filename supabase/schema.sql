@@ -28,6 +28,7 @@ create table if not exists pengurus (
 -- ============ TABEL KEUANGAN ============
 create table if not exists keuangan (
   id uuid primary key default gen_random_uuid(),
+  tanggal date not null default current_date,
   tahun int not null check (tahun between 2021 and 2030),
   bulan int not null check (bulan between 1 and 12),
   jenis text not null check (jenis in ('masuk','keluar')),

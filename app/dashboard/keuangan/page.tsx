@@ -19,14 +19,32 @@ const BULAN = [
 
 const TAHUN_LIST = Array.from({ length: 2030 - 2021 + 1 }, (_, i) => 2021 + i)
 
-const emptyForm = {
-  tahun: new Date().getFullYear(),
-  bulan: new Date().getMonth() + 1,
-  jenis: 'masuk' as 'masuk' | 'keluar',
-  kategori: '',
-  keterangan: '',
-  jumlah: 0,
-  bukti_url: '',
+const pad2 = (n: number) => String(n).padStart(2, '0')
+
+// Hindari masalah timezone: ambil tahun & bulan langsung dari string "YYYY-MM-DD"
+const deriveYearMonth = (dateStr: string) => {
+  const [y, m] = dateStr.split('-').map(Number)
+  return { tahun: y, bulan: m }
+}
+
+const formatTanggal = (dateStr: string) =>
+  new Date(dateStr + 'T00:00:00').toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
+
+const today = () => new Date().toISOString().slice(0, 10)
+
+const emptyForm = () => {
+  const t = today()
+  const { tahun, bulan } = deriveYearMonth(t)
+  return {
+    tanggal: t,
+    tahun,
+    bulan,
+    jenis: 'masuk' as 'masuk' | 'keluar',
+    kategori: '',
+    keterangan: '',
+    jumlah: 0,
+    bukti_url: '',
+  }
 }
 
 export default function KeuanganPage() {
@@ -38,13 +56,13 @@ export default function KeuanganPage() {
   const [bulan, setBulan] = useState<number | 'all'>('all')
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Keuangan | null>(null)
-  const [form, setForm] = useState(emptyForm)
+  const [form, setForm] = useState(emptyForm())
 
   const fetchData = async () => {
     setLoading(true)
     let query = supabase.from('keuangan').select('*').eq('tahun', tahun)
     if (bulan !== 'all') query = query.eq('bulan', bulan)
-    const { data: rows, error } = await query.order('bulan', { ascending: true })
+    const { data: rows, error } = await query.order('tanggal', { ascending: true })
     if (error) toast.error('Gagal memuat data keuangan')
     setData(rows ?? [])
     setLoading(false)
@@ -68,19 +86,37 @@ export default function KeuanganPage() {
     })
   }, [data])
 
+  // Tentukan tanggal default saat menambah transaksi, berdasarkan filter aktif
+  const getDefaultTanggal = () => {
+    const now = new Date()
+    const curYear = now.getFullYear()
+    const curMonth = now.getMonth() + 1
+
+    if (bulan === 'all') {
+      return tahun === curYear ? today() : `${tahun}-01-01`
+    }
+    if (tahun === curYear && bulan === curMonth) return today()
+    return `${tahun}-${pad2(bulan)}-01`
+  }
+
   const openAdd = () => {
     setEditing(null)
-    setForm({ ...emptyForm, tahun, bulan: bulan === 'all' ? new Date().getMonth() + 1 : bulan })
+    const tanggal = getDefaultTanggal()
+    setForm({ ...emptyForm(), tanggal, ...deriveYearMonth(tanggal) })
     setModalOpen(true)
   }
 
   const openEdit = (k: Keuangan) => {
     setEditing(k)
     setForm({
-      tahun: k.tahun, bulan: k.bulan, jenis: k.jenis, kategori: k.kategori,
+      tanggal: k.tanggal, tahun: k.tahun, bulan: k.bulan, jenis: k.jenis, kategori: k.kategori,
       keterangan: k.keterangan ?? '', jumlah: k.jumlah, bukti_url: k.bukti_url ?? '',
     })
     setModalOpen(true)
+  }
+
+  const handleTanggalChange = (tanggal: string) => {
+    setForm({ ...form, tanggal, ...deriveYearMonth(tanggal) })
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -116,7 +152,7 @@ export default function KeuanganPage() {
 
     let y = 32
     doc.setFontSize(11)
-    doc.text('Bulan', 14, y)
+    doc.text('Tanggal', 14, y)
     doc.text('Jenis', 50, y)
     doc.text('Kategori', 80, y)
     doc.text('Keterangan', 115, y)
@@ -127,7 +163,7 @@ export default function KeuanganPage() {
 
     data.forEach((row) => {
       if (y > 280) { doc.addPage(); y = 20 }
-      doc.text(BULAN[row.bulan - 1].slice(0, 3), 14, y)
+      doc.text(formatTanggal(row.tanggal), 14, y)
       doc.text(row.jenis, 50, y)
       doc.text(row.kategori, 80, y)
       doc.text((row.keterangan ?? '-').slice(0, 28), 115, y)
@@ -213,8 +249,8 @@ export default function KeuanganPage() {
             <XAxis dataKey="bulan" fontSize={12} />
             <YAxis fontSize={12} tickFormatter={(v) => `${v / 1000}k`} />
             <Tooltip formatter={(v) => `Rp ${Number(v).toLocaleString('id-ID')}`} />
-            <Bar dataKey="masuk" fill="#10b981" radius={[4, 4, 0, 0]} name="Pemasukan" />
-            <Bar dataKey="keluar" fill="#ef4444" radius={[4, 4, 0, 0]} name="Pengeluaran" />
+            <Bar dataKey="masuk" fill="#6f9472" radius={[4, 4, 0, 0]} name="Pemasukan" />
+            <Bar dataKey="keluar" fill="#c08552" radius={[4, 4, 0, 0]} name="Pengeluaran" />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -224,7 +260,7 @@ export default function KeuanganPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-200 dark:border-gray-800 text-left text-gray-500">
-              <th className="px-4 py-3">Bulan</th>
+              <th className="px-4 py-3">Tanggal</th>
               <th className="px-4 py-3">Jenis</th>
               <th className="px-4 py-3">Kategori</th>
               <th className="px-4 py-3">Keterangan</th>
@@ -239,7 +275,7 @@ export default function KeuanganPage() {
               <tr><td colSpan={6} className="px-4 py-6 text-center text-gray-500">Belum ada transaksi pada periode ini.</td></tr>
             ) : data.map((row) => (
               <tr key={row.id} className="border-b border-gray-100 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/40">
-                <td className="px-4 py-3">{BULAN[row.bulan - 1]}</td>
+                <td className="px-4 py-3 whitespace-nowrap">{formatTanggal(row.tanggal)}</td>
                 <td className="px-4 py-3">
                   <span className={`text-xs px-2 py-1 rounded-full ${row.jenis === 'masuk' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400' : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400'}`}>
                     {row.jenis === 'masuk' ? 'Pemasukan' : 'Pengeluaran'}
@@ -264,19 +300,20 @@ export default function KeuanganPage() {
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Transaksi' : 'Tambah Transaksi'}>
         <form onSubmit={handleSubmit} className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-sm font-medium block mb-1">Tahun</label>
-              <select value={form.tahun} onChange={(e) => setForm({ ...form, tahun: Number(e.target.value) })} className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent px-3 py-2 text-sm">
-                {TAHUN_LIST.map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-sm font-medium block mb-1">Bulan</label>
-              <select value={form.bulan} onChange={(e) => setForm({ ...form, bulan: Number(e.target.value) })} className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent px-3 py-2 text-sm">
-                {BULAN.map((b, i) => <option key={b} value={i + 1}>{b}</option>)}
-              </select>
-            </div>
+          <div>
+            <label className="text-sm font-medium block mb-1">Tanggal Transaksi</label>
+            <input
+              type="date"
+              required
+              min={`${TAHUN_LIST[0]}-01-01`}
+              max={`${TAHUN_LIST[TAHUN_LIST.length - 1]}-12-31`}
+              value={form.tanggal}
+              onChange={(e) => handleTanggalChange(e.target.value)}
+              className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent px-3 py-2 text-sm"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              Tahun &amp; bulan laporan ({form.tahun} / {BULAN[form.bulan - 1]}) otomatis diambil dari tanggal ini.
+            </p>
           </div>
           <div>
             <label className="text-sm font-medium block mb-1">Jenis</label>

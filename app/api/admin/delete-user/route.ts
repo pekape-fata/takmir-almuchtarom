@@ -1,11 +1,6 @@
-import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { createServerSupabase } from '@/lib/supabase-server'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { getSupabaseAdmin } from '@/lib/supabase-admin'
 
 export async function POST(req: Request) {
   try {
@@ -26,6 +21,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Tidak dapat menghapus akun sendiri' }, { status: 400 })
     }
 
+    const supabaseAdmin = getSupabaseAdmin()
     const { error } = await supabaseAdmin.auth.admin.deleteUser(target_user_id)
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 

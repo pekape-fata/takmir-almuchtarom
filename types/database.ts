@@ -21,6 +21,7 @@ export interface Pengurus {
 
 export interface Keuangan {
   id: string
+  tanggal: string
   tahun: number
   bulan: number
   jenis: 'masuk' | 'keluar'
