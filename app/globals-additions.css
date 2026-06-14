@@ -1,0 +1,50 @@
+/* =========================================================
+   TAMBAHKAN isi ini ke dalam file app/globals.css Anda
+   ========================================================= */
+
+/* --- Dark mode: pastikan selector html.dark aktif --- */
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+  .dark {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-white text-gray-900;
+  }
+
+  .dark body {
+    @apply bg-gray-950 text-gray-100;
+  }
+}
+
+/* =========================================================
+   PRINT STYLES — sembunyikan tombol aksi saat mencetak
+   ========================================================= */
+@media print {
+  /* Sembunyikan tombol Cetak dan Tambah Pengurus */
+  .no-print,
+  [data-no-print] {
+    display: none !important;
+  }
+
+  /* Opsional: hilangkan header/navbar saat print */
+  nav,
+  header.site-header {
+    display: none !important;
+  }
+
+  /* Pastikan kartu pengurus tampil rapi */
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Hindari page-break di tengah kartu */
+  .pengurus-card {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}

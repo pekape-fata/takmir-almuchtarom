@@ -1,0 +1,31 @@
+// app/layout.tsx — contoh struktur yang benar
+// Pastikan ThemeProvider membungkus seluruh <body>
+
+import type { Metadata } from 'next'
+import './globals.css'
+import { ThemeProvider } from '@/components/ThemeProvider'
+
+export const metadata: Metadata = {
+  title: 'Takmir Langgar Waqaf Al Muchtarom',
+  description: 'Dashboard Takmir',
+}
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="id" suppressHydrationWarning>
+      {/*
+        suppressHydrationWarning WAJIB ada di <html> agar next-themes
+        tidak menyebabkan hydration mismatch saat class "dark" diterapkan
+      */}
+      <body>
+        <ThemeProvider>
+          {children}
+        </ThemeProvider>
+      </body>
+    </html>
+  )
+}
