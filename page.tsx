@@ -36,8 +36,16 @@ export default function LoginPage() {
       .single()
 
     toast.success(`Selamat datang, ${username}!`)
-	router.push('/')
-	router.refresh()
+
+    // ✅ refresh() DULU agar sesi Supabase terbaca server, baru push
+    router.refresh()
+
+    if (profile?.force_password_change) {
+      router.push('/change-password')
+    } else {
+      router.push('/')
+    }
+  }
 
   return (
     <div className="min-h-[80vh] flex items-center justify-center px-4">
@@ -45,14 +53,15 @@ export default function LoginPage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
-        className="w-full max-w-sm rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-8 shadow-sm"
+        className="w-full max-w-sm rounded-2xl border bg-white dark:bg-gray-900 p-8 shadow-sm"
+        style={{ borderColor: 'var(--card-border)' }}
       >
         <div className="text-center mb-6">
           <div className="w-12 h-12 rounded-2xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto mb-3">
             <LogIn size={22} />
           </div>
           <h1 className="text-xl font-bold">Login Takmir</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+          <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>
             Masuk untuk mengakses fitur pengelolaan
           </p>
         </div>
@@ -101,7 +110,7 @@ export default function LoginPage() {
           </motion.button>
         </form>
 
-        <p className="text-xs text-gray-400 text-center mt-5">
+        <p className="text-xs text-center mt-5" style={{ color: 'var(--muted)' }}>
           Lupa password? Hubungi admin Takmir untuk reset akun.
         </p>
       </motion.div>
