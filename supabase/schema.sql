@@ -139,6 +139,11 @@ create policy "Admin lihat semua profil" on profiles
 create policy "User update profil sendiri" on profiles
   for update to authenticated using (id = auth.uid());
 
+create policy "Admin update semua profil" on profiles
+  for update to authenticated
+  using (current_role_is(array['admin']))
+  with check (current_role_is(array['admin']));
+
 -- ---------- PENGURUS (publik bisa baca) ----------
 create policy "Publik baca pengurus" on pengurus
   for select to anon, authenticated using (true);

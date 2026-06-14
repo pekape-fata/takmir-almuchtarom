@@ -13,7 +13,11 @@ siap deploy via GitHub → Vercel.
 - **Kegiatan** — agenda kegiatan takmir, CRUD.
 - **Jadwal Sholat** — realtime berdasarkan geolokasi pengguna (Aladhan API), termasuk jadwal bulanan.
 - **Konsultasi** — form tanya jawab (Agama, Keluarga, Pendidikan, Ekonomi, Sosial). Draft jawaban dibuat AI (Claude), lalu diverifikasi ustadz/admin sebelum dipublikasikan.
+- **Profil Saya** — user dapat mengubah nama lengkap & password sendiri.
+- **Kelola User** (khusus admin) — tambah user baru (username + password default + role), ubah role, reset password, hapus user.
 - **Dark/Light mode**, animasi modern dengan Framer Motion.
+
+> 📘 Untuk langkah deploy lengkap & berurutan (GitHub → Supabase → Vercel), lihat **[DEPLOYMENT.md](./DEPLOYMENT.md)**.
 
 ## 🛠️ Teknologi
 
@@ -96,8 +100,12 @@ app/
     jadwal-sholat/           # Jadwal sholat realtime
     konsultasi/              # Tanya jawab + verifikasi ustadz
       [id]/verify/
+    profile/                 # Profil & ganti password (user login)
+    admin/users/             # Kelola user (khusus admin)
   api/
     admin/create-user/       # Admin membuat akun baru
+    admin/reset-password/    # Admin reset password user
+    admin/delete-user/       # Admin hapus user
     konsultasi/draft/         # Generate draft AI (Claude)
 components/                  # Navbar, ThemeToggle, Modal, dll
 lib/                          # Supabase client, helper

@@ -40,7 +40,7 @@ export default function LoginPage() {
     if (profile?.force_password_change) {
       router.push('/change-password')
     } else {
-      router.push('/dashboard')
+      router.push('/')
     }
     router.refresh()
   }

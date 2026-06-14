@@ -54,7 +54,7 @@ export default function ChangePasswordPage() {
     }
 
     toast.success('Password berhasil diubah')
-    router.push('/dashboard')
+    router.push('/')
     router.refresh()
   }
 

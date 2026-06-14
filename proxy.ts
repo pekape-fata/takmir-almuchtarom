@@ -26,29 +26,30 @@ export async function proxy(request: NextRequest) {
   )
 
   const { data: { user } } = await supabase.auth.getUser()
-
   const path = request.nextUrl.pathname
 
-  // Halaman yang butuh login
-  const protectedPaths = ['/dashboard/pengurus/edit', '/dashboard/keuangan/tambah', '/change-password']
+  // Halaman yang wajib login
+  const requiresLogin = path === '/change-password' || path.startsWith('/dashboard/profile') || path.startsWith('/dashboard/admin')
 
-  const isProtected = protectedPaths.some((p) => path.startsWith(p))
-
-  if (isProtected && !user) {
-    const redirectUrl = new URL('/login', request.url)
-    return NextResponse.redirect(redirectUrl)
+  if (requiresLogin && !user) {
+    return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // Jika sudah login dan wajib ganti password, paksa ke /change-password
-  if (user && path.startsWith('/dashboard')) {
+  if (user) {
     const { data: profile } = await supabase
       .from('profiles')
-      .select('force_password_change')
+      .select('role, force_password_change')
       .eq('id', user.id)
       .single()
 
-    if (profile?.force_password_change && path !== '/change-password') {
+    // Wajib ganti password sebelum mengakses dashboard manapun
+    if (profile?.force_password_change && path.startsWith('/dashboard') && path !== '/change-password') {
       return NextResponse.redirect(new URL('/change-password', request.url))
+    }
+
+    // Halaman admin hanya untuk role admin
+    if (path.startsWith('/dashboard/admin') && profile?.role !== 'admin') {
+      return NextResponse.redirect(new URL('/', request.url))
     }
   }
 
